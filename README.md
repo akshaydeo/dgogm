@@ -38,7 +38,9 @@ func main() {
 	}
 }
 ```
+
 **Query:**
+
 ```graphql
 {
   dog(func: eq(_xid_,"1_dog")){
@@ -58,6 +60,10 @@ func main() {
   }
 }
 ```
+**Graph**
+
+![Resulting Graph](https://github.com/akshaydeo/dgorm/raw/master/.github/one.png)
+
 **Response**
 ```graphql
 {
