@@ -8,22 +8,34 @@ import 	"github.com/akshaydeo/dgorm"
 
 // Struct definition
 type Dog struct {
-	Id    int    `dgraph:"uid"`
-	Name  string `dgraph:"name"`
-	Color string `json:"color" dgraph:"color"`
+	Id        int      `dgraph:"uid"`
+	Name      string   `dgraph:"name"`
+	Color     *string  `json:"color" dgraph:"color"`
+	Likes     []Place  `dgraph:"likes_places"`
+	Nicknames []string `dgraph:"nicknames"`
+	LivesAt   Place    `dgraph:"lives_at"`
+	BornAt    *Place   `dgraph:"born_at"`
 }
 
 // Adding object to the dgraph
 func main() {
   	dg, err := dgorm.Connect([]string{"127.0.0.1:9080"})
-  	if err != nil {
+	if err != nil {
 		t.Fail()
 	}
 	d := new(Dog)
 	d.Id = 1
 	d.Name = "jarvis"
-	d.Color = "white"
+	d.Color = dgorm.StrPtr("white")
+	d.Likes = []Place{Place{1, "Pune"}, Place{2, "Mumbai"}}
+	d.Nicknames = []string{"chotu", "motu"}
+	d.LivesAt = Place{1, "Pune"}
+	d.BornAt = &Place{3, "Solapur"}
 	err = dg.Add(d)
+	if err != nil {
+		log.Println(err.Error())
+		t.Fail()
+	}
 }
 ```
 
@@ -34,6 +46,16 @@ Is mapped to
   dog(func: eq(_xid_,"1_dog")){
     name
     color
+    likes_places{
+      name
+    }
+    nicknames
+    lives_at{
+      name
+    }
+    born_at{
+      name
+    }
     _xid_
   }
 }
@@ -47,14 +69,37 @@ Is mapped to
         "_uid_": "0x51a7841f167dabad",
         "name": "jarvis",
         "color": "white",
+        "likes_places": [
+          {
+            "_uid_": "0x83a2ae6cfa98d908",
+            "name": "Pune"
+          },
+          {
+            "_uid_": "0x95197ab5b88df9a1",
+            "name": "Mumbai"
+          }
+        ],
+        "nicknames": "[\"chotu\",\"motu\"]",
+        "lives_at": [
+          {
+            "_uid_": "0x83a2ae6cfa98d908",
+            "name": "Pune"
+          }
+        ],
+        "born_at": [
+          {
+            "_uid_": "0xcac342aaf75a6256",
+            "name": "Solapur"
+          }
+        ],
         "_xid_": "1_dog"
       }
     ],
     "server_latency": {
-      "parsing": "135µs",
-      "processing": "425µs",
-      "json": "124µs",
-      "total": "691µs"
+      "total": "504µs",
+      "parsing": "124µs",
+      "processing": "295µs",
+      "json": "82µs"
     }
   }
 }
@@ -64,6 +109,7 @@ Is mapped to
 ## Supported datatypes
 - Primitive datatypes
 - Pointer to struct
+- Pointer to primitive datatypes
 - Structs
 - Slice of pointer to primitive datatypes
 - Slice of primitive datatypes
