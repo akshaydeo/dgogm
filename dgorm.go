@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"github.com/dgraph-io/dgraph/client"
+	"github.com/pkg/errors"
 )
 
 // This function adds the given pointer to struct into the Dgraph
@@ -17,11 +18,22 @@ import (
 // 5. If the field is a primitive type, its added as a predicate to the given node
 // 6. If the field is a struct or pointer to struct then a new relation node is added
 func (d *Dgraph) Add(p interface{}) error {
-	return d.add(GetUId(p), p)
+	_, err := d.add(GetUId(p), p)
+	return err
+}
+
+func isPrimitiveKind(kind reflect.Kind) bool {
+	switch kind {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float64, reflect.Float32, reflect.String, reflect.Bool:
+		return true
+	}
+	return false
 }
 
 // Internal function, performing addition of the object into dgraph
-func (d *Dgraph) add(sid string, p interface{}) error {
+func (d *Dgraph) add(sid string, p interface{}) (*client.Node, error) {
 	// Get type info of p
 	t := reflect.TypeOf(p)
 	// Get value info of p
@@ -31,13 +43,13 @@ func (d *Dgraph) add(sid string, p interface{}) error {
 	var err error
 	// Creating request object
 	r := new(client.Req)
-	// Creating source node and attach _xid_ to it
+	// Creating source node and process _xid_ to it
 	snode := d.client.NodeUid(hash(sid))
 	e := snode.Edge("_xid_")
 	e.SetValueString(sid)
 	err = r.Set(e)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// Ranging over the interface fields
 	for i := 0; i < v.Elem().NumField(); i++ {
@@ -45,98 +57,168 @@ func (d *Dgraph) add(sid string, p interface{}) error {
 		if fname == "-" {
 			continue
 		}
+		// Skip zero values
+		if IsZero(v.Elem().Field(i)) {
+			continue
+		}
 		Debug("Adding edge %s", getFieldName(t.Elem().Field(i)))
 		switch v.Elem().Field(i).Kind() {
 		case reflect.Slice:
+			var tnode *client.Node
+			if v.Elem().Field(i).Len() == 0 {
+				return nil, nil
+			}
+			// Check if this array contains a primitive kind of elements
+			Debug("kind is %s", v.Elem().Field(i).Index(0).Type().Kind())
+			if isPrimitiveKind(v.Elem().Field(i).Index(0).Type().Kind()) {
+				// Then jsonify them and push them inside
+				Debug("Adding %s", ToJsonUnsafe(v.Elem().Field(i).Interface()))
+				_, err = d.process(r, snode, t.Elem().Field(i), reflect.ValueOf(ToJsonUnsafe(v.Elem().Field(i).Interface())))
+				if err != nil {
+					return nil, err
+				}
+				continue
+			}
+			// Check if this array contains pointer to primitive types
+			if isPrimitiveKind(v.Elem().Field(i).Index(0).Type().Elem().Kind()) {
+				// Then jsonify them and push them inside
+				Debug("Adding ptr %s", ToJsonUnsafe(v.Elem().Field(i).Interface()))
+				_, err = d.process(r, snode, t.Elem().Field(i), reflect.ValueOf(ToJsonUnsafe(v.Elem().Field(i).Interface())))
+				if err != nil {
+					return nil, err
+				}
+				continue
+			}
 			for j := 0; j < v.Elem().Field(i).Len(); j++ {
-				Debug("loop", j, v.Elem().Field(i).Type(), t.Elem().Field(i).Type.Elem())
-				// Check if the elements are of type ptr, things have to be handled a bit differently
-				switch t.Elem().Field(i).Type.Elem().Kind() {
-				case reflect.Ptr:
-					Debug("its ptr******")
-
+				switch v.Elem().Field(i).Index(j).Kind() {
 				case reflect.Struct:
-
+					tnode, err = d.add(GetUId(v.Elem().Field(i).Index(j).Addr().Interface()),
+						v.Elem().Field(i).Index(j).Addr().Interface())
+					if err != nil {
+						return nil, err
+					}
+					e = snode.ConnectTo(getFieldName(t.Elem().Field(i)), *tnode)
+					err = r.Set(e)
+					if err != nil {
+						return nil, err
+					}
+				case reflect.Ptr:
+					tnode, err = d.add(GetUId(v.Elem().Field(i).Index(j).Interface()),
+						v.Elem().Field(i).Index(j).Interface())
+					if err != nil {
+						return nil, err
+					}
+					if tnode == nil {
+						continue
+					}
+					e = snode.ConnectTo(getFieldName(t.Elem().Field(i)), *tnode)
+					err = r.Set(e)
+					if err != nil {
+						return nil, err
+					}
+				default:
+					return nil, errors.New("Does not support " + t.Elem().Field(i).Type.String())
 				}
 			}
-		case reflect.Ptr:
-			Debug("its ptr******", t.Elem().Field(i).Type.Elem())
-
-		case reflect.Struct:
-			Debug("its struct******", t.Elem().Field(i).Type)
-
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			e = snode.Edge(getFieldName(t.Elem().Field(i)))
-			err = setVal(&e, v.Elem().Field(i).Int())
+		default:
+			_, err = d.process(r, snode, t.Elem().Field(i), v.Elem().Field(i))
 			if err != nil {
-				return err
-			}
-			err = r.Set(e)
-			if err != nil {
-				return err
-			}
-			_, err = d.client.Run(context.Background(), r)
-			if err != nil {
-				return err
-			}
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			// This includes all primitive types
-			e = snode.Edge(getFieldName(t.Elem().Field(i)))
-			err = setVal(&e, v.Elem().Field(i).Uint())
-			if err != nil {
-				return err
-			}
-			err = r.Set(e)
-			if err != nil {
-				return err
-			}
-			_, err = d.client.Run(context.Background(), r)
-			if err != nil {
-				return err
-			}
-		case reflect.Float64, reflect.Float32:
-			e = snode.Edge(getFieldName(t.Elem().Field(i)))
-			err = setVal(&e, v.Elem().Field(i).Float())
-			if err != nil {
-				return err
-			}
-			err = r.Set(e)
-			if err != nil {
-				return err
-			}
-			_, err = d.client.Run(context.Background(), r)
-			if err != nil {
-				return err
-			}
-		case reflect.String:
-			e = snode.Edge(getFieldName(t.Elem().Field(i)))
-			err = setVal(&e, v.Elem().Field(i).String())
-			if err != nil {
-				return err
-			}
-			err = r.Set(e)
-			if err != nil {
-				return err
-			}
-			_, err = d.client.Run(context.Background(), r)
-			if err != nil {
-				return err
-			}
-		case reflect.Bool:
-			e = snode.Edge(getFieldName(t.Elem().Field(i)))
-			err = setVal(&e, v.Elem().Field(i).Bool())
-			if err != nil {
-				return err
-			}
-			err = r.Set(e)
-			if err != nil {
-				return err
-			}
-			_, err = d.client.Run(context.Background(), r)
-			if err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
-	return nil
+	_, err = d.client.Run(context.Background(), r)
+	if err != nil {
+		return nil, err
+	}
+	return &snode, nil
+}
+
+// TODO
+func (d *Dgraph) process(r *client.Req, snode client.Node, field reflect.StructField, value reflect.Value) (*client.Edge, error) {
+	var e client.Edge
+	var err error
+	switch value.Kind() {
+	case reflect.Ptr:
+		Debug("its ptr******", field.Type.Elem())
+		tnode, err := d.add(GetUId(value.Interface()), value.Interface())
+		if err != nil {
+			return nil, err
+		}
+		if tnode == nil {
+			return nil, nil
+		}
+		e = snode.ConnectTo(getFieldName(field), *tnode)
+		err = r.Set(e)
+		if err != nil {
+			return nil, err
+		}
+	case reflect.Struct:
+		Debug("its struct******", field.Type)
+		tnode, err := d.add(GetUId(value.Addr().Interface()), value.Addr().Interface())
+		if err != nil {
+			return nil, err
+		}
+		if tnode == nil {
+			return nil, nil
+		}
+		e = snode.ConnectTo(getFieldName(field), *tnode)
+		err = r.Set(e)
+		if err != nil {
+			return nil, err
+		}
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		e = snode.Edge(getFieldName(field))
+		err = setVal(&e, value.Int())
+		if err != nil {
+			return nil, err
+		}
+		err = r.Set(e)
+		if err != nil {
+			return nil, err
+		}
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		// This includes all primitive types
+		e = snode.Edge(getFieldName(field))
+		err = setVal(&e, value.Uint())
+		if err != nil {
+			return nil, err
+		}
+		err = r.Set(e)
+		if err != nil {
+			return nil, err
+		}
+	case reflect.Float64, reflect.Float32:
+		e = snode.Edge(getFieldName(field))
+		err = setVal(&e, value.Float())
+		if err != nil {
+			return nil, err
+		}
+		err = r.Set(e)
+		if err != nil {
+			return nil, err
+		}
+	case reflect.String:
+		Debug("Adding string %s => %s", getFieldName(field), value.String())
+		e = snode.Edge(getFieldName(field))
+		err = setVal(&e, value.String())
+		if err != nil {
+			return nil, err
+		}
+		err = r.Set(e)
+		if err != nil {
+			return nil, err
+		}
+	case reflect.Bool:
+		e = snode.Edge(getFieldName(field))
+		err = setVal(&e, value.Bool())
+		if err != nil {
+			return nil, err
+		}
+		err = r.Set(e)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &e, nil
 }

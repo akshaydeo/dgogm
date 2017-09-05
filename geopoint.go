@@ -12,5 +12,5 @@ type GeoGeometry struct {
 }
 
 func (gp *GeoPoint) Json() *string {
-	return ToJsonUnsafe(gp)
+	return StrPtr(ToJsonUnsafe(gp))
 }
