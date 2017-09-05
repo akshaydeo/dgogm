@@ -1,10 +1,11 @@
-# Dgorm : Dgraph ORM
+# Dgorm : Dgraph OGM
 
+OGM is synonymous for ORM, Object Graph Mapping. Thanks @gazaidi for suggesting this.
 
 ## How it works?
 
 ```go
-import 	"github.com/akshaydeo/dgorm"
+import 	"github.com/akshaydeo/dgogm"
 
 // Struct definition
 type Dog struct {
@@ -19,7 +20,7 @@ type Dog struct {
 
 // Adding object to the dgraph
 func main() {
-  	dg, err := dgorm.Connect([]string{"127.0.0.1:9080"})
+  	dg, err := dgogm.Connect([]string{"127.0.0.1:9080"})
 	if err != nil {
 		t.Fail()
 	}
