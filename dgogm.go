@@ -54,6 +54,17 @@ func nodeMap(n *protos.Node) map[string]interface{} {
 		m[p.Prop] = v
 	}
 	for _, c := range n.Children {
+		// Check if the attribute is already set
+		children, ok := m[c.Attribute]
+		if ok {
+			switch children.(type) {
+			case []*protos.Node:
+				m[c.Attribute] = append(children.([]*protos.Node), c)
+			case *protos.Node:
+				m[c.Attribute] = []*protos.Node{children.(*protos.Node), c}
+			}
+			continue
+		}
 		m[c.Attribute] = c
 	}
 	return m
@@ -76,6 +87,7 @@ func parseNodeTo(n *protos.Node, p interface{}) {
 			Debug("Property %s is not present in the results", fname)
 			continue
 		}
+		Debug("%v", val)
 		if !v.Elem().Field(i).IsValid() {
 			logger.W("Invalid field", v.Elem().Field(i).String(), t.Elem().Field(i).Name)
 			continue
@@ -83,9 +95,43 @@ func parseNodeTo(n *protos.Node, p interface{}) {
 		Debug("%s %s", reflect.ValueOf(val).Type().String(), t.Elem().Field(i).Type)
 		switch v.Elem().Field(i).Kind() {
 		case reflect.Slice:
-			Debug("slices are not handled yet")
+			var nodes []*protos.Node
+			switch val.(type) {
+			case *protos.Node:
+				nodes = []*protos.Node{val.(*protos.Node)}
+			case []*protos.Node:
+				nodes = val.([]*protos.Node)
+			}
+			// Check if types match or not
+			// Checking if the given field is already initialized
+			if v.Elem().Field(i).IsNil() {
+				// Initializing slice
+				v.Elem().Field(i).Set(reflect.MakeSlice(reflect.SliceOf(t.Elem().Field(i).Type.Elem()), 0, len(nodes)))
+			}
+			Debug("Processing slices %d", len(nodes))
+			// Iterating and initializing
+			for j := 0; j < len(nodes); j++ {
+				// Check if the elements are of type ptr, things have to be handled a bit differently
+				switch t.Elem().Field(i).Type.Elem().Kind() {
+				case reflect.Ptr:
+					Debug("its ptr****** %d", j)
+					nf := reflect.New(t.Elem().Field(i).Type.Elem().Elem())
+					parseNodeTo(nodes[j], nf.Interface())
+					v.Elem().Field(i).Set(reflect.Append(v.Elem().Field(i), nf))
+				case reflect.Struct:
+					Debug("Struct")
+					Debug("%d Its a struct**** %s", j, t.Elem().Field(i).Type.Elem().String())
+					nf := reflect.New(t.Elem().Field(i).Type.Elem())
+					parseNodeTo(nodes[j], nf.Interface())
+					v.Elem().Field(i).Set(reflect.Append(v.Elem().Field(i), nf.Elem()))
+				default:
+					Debug("None")
+				}
+			}
 		case reflect.Ptr:
-			Debug("Ptrs are not yet supported")
+			nf := reflect.New(t.Elem().Field(i).Type.Elem())
+			parseNodeTo(val.(*protos.Node), nf.Interface())
+			v.Elem().Field(i).Set(nf)
 		case reflect.Struct:
 			nf := reflect.New(t.Elem().Field(i).Type)
 			parseNodeTo(val.(*protos.Node), nf.Interface())
@@ -112,40 +158,6 @@ func (d *Dgraph) query(q string) ([]*protos.Node, error) {
 		return nil, err
 	}
 	return resp.N, err
-}
-
-// This function converts types into fields query for Dgraph
-func getFieldMap(t reflect.Type, parent string, m FieldMap) {
-	Debug("%s", t.Name())
-	for i := 0; i < t.NumField(); i++ {
-		Debug("Checking if its a primitive type %s", getFieldName(t.Field(i)))
-		if isPrimitiveType(t.Field(i).Type) {
-			m.Add(parent, getFieldName(t.Field(i)))
-			continue
-		}
-		Debug("Non primitive type %s", getFieldName(t.Field(i)))
-		switch t.Kind() {
-		case reflect.Slice:
-		case reflect.Struct:
-			nm := FieldMap{}
-			getFieldMap(t.Field(i).Type, getFieldName(t.Field(i)), nm)
-			m.Add(parent, nm)
-		case reflect.Ptr:
-		}
-	}
-}
-
-// This function returns if given type is a or points to a primitive type
-func isPrimitiveType(tp reflect.Type) bool {
-	switch tp.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
-		reflect.Float64, reflect.Float32, reflect.String, reflect.Bool:
-		return true
-	case reflect.Ptr:
-		return isPrimitiveType(tp.Elem())
-	}
-	return false
 }
 
 // Internal function, performing addition of the object into dgraph

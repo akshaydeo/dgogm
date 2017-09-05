@@ -24,13 +24,13 @@ func TestDgraph_FindById(t *testing.T) {
 	if err != nil {
 		t.Fail()
 	}
-	d := new(Dog2)
+	d := new(Dog5)
 	d.Id = 1
 	err = dg.FindById(d)
 	if err != nil {
 		t.Fail()
 	}
-	fmt.Printf("%v", d)
+	fmt.Printf("%v %v", d, d.LikesPlace)
 }
 
 func TestDgraph_AddWithAllPossibleCases(t *testing.T) {

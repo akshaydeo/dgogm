@@ -1,6 +1,9 @@
 package dgogm
 
-import "fmt"
+import (
+	"fmt"
+	"reflect"
+)
 
 // Field map type defines query fields
 type FieldMap map[string][]interface{}
@@ -44,6 +47,36 @@ func getQuery(q *string, fm FieldMap) {
 		}
 		if k != "" {
 			*q = fmt.Sprintf("%s }", *q)
+		}
+	}
+}
+
+// This function converts types into fields query for Dgraph
+func getFieldMap(t reflect.Type, parent string, m FieldMap) {
+	Debug("%s", t.Name())
+	for i := 0; i < t.NumField(); i++ {
+		Debug("Checking if its a primitive type %s", getFieldName(t.Field(i)))
+		if isPrimitiveType(t.Field(i).Type) {
+			m.Add(parent, getFieldName(t.Field(i)))
+			continue
+		}
+		Debug("Non primitive type %s", getFieldName(t.Field(i)))
+		switch t.Field(i).Type.Kind() {
+		case reflect.Slice:
+			Debug("It's a slice")
+			Debug("%s []%s", getFieldName(t.Field(i)), t.Field(i).Type.Elem().Name())
+			nm := FieldMap{}
+			getFieldMap(t.Field(i).Type.Elem(), getFieldName(t.Field(i)), nm)
+			m.Add(parent, nm)
+		case reflect.Struct:
+			nm := FieldMap{}
+			getFieldMap(t.Field(i).Type, getFieldName(t.Field(i)), nm)
+			m.Add(parent, nm)
+		case reflect.Ptr:
+			Debug("It's a ptr type")
+			nm := FieldMap{}
+			getFieldMap(t.Field(i).Type.Elem(), getFieldName(t.Field(i)), nm)
+			m.Add(parent, nm)
 		}
 	}
 }
