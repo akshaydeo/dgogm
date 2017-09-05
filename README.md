@@ -1,3 +1,5 @@
+# Dgogm : Dgraph OGM
+
 OGM is synonymous for ORM, Object Graph Mapping. Thanks @gazaidi for suggesting this.
 
 ## How it works?
