@@ -2,12 +2,16 @@ package dgorm
 
 import (
 	"encoding/json"
+	"errors"
 
 	"fmt"
 	"reflect"
 	"strings"
 	"time"
 
+	"hash/fnv"
+
+	"github.com/dgraph-io/dgraph/client"
 	"github.com/dgraph-io/dgraph/protos"
 )
 
@@ -25,12 +29,33 @@ func getFieldName(f reflect.StructField) string {
 	return f.Name
 }
 
+// This function returns a new 64-bit FNV-1a hash.Hash
+func hash(i string) uint64 {
+	f := fnv.New64a()
+	f.Write([]byte(i))
+	return f.Sum64()
+}
+
 // This function returns _uid_ for the given struct
+// It checks if there is a function called UId which returns string,
+// if it's there, that function will be used to return the uid
 func GetUId(p interface{}) string {
 	// Get type info of p
 	t := reflect.TypeOf(p)
 	if t.Kind() != reflect.Ptr {
 		panic("GetUId expects pointer to struct")
+	}
+	_, ok := t.MethodByName("UId")
+	if ok {
+		uid := reflect.ValueOf(p).MethodByName("UId").Call([]reflect.Value{})[0]
+		switch uid.Kind() {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Bool, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			return fmt.Sprintf("%d", uid.Int())
+		case reflect.Float64, reflect.Float32:
+			return fmt.Sprintf("%f", uid.Float())
+		case reflect.String:
+			return uid.String()
+		}
 	}
 	for i := 0; i < t.Elem().NumField(); i++ {
 		if getFieldName(t.Elem().Field(i)) == "uid" {
@@ -77,6 +102,31 @@ func getVal(val interface{}) *protos.Value {
 	return nil
 }
 
+// Sets val to the given edge
+func setVal(edge *client.Edge, val interface{}) error {
+	switch val.(type) {
+	case int, int64, int8, int32, int16:
+		return edge.SetValueInt(val.(int64))
+	case string:
+		if val.(string) == "" {
+			return errors.New("Empty")
+		}
+		return edge.SetValueString(strings.Replace(val.(string), "\"", "\\\"", -1))
+	case float64, float32:
+		return edge.SetValueFloat(val.(float64))
+	case time.Time:
+		return edge.SetValueDatetime(val.(time.Time))
+	case bool:
+		return edge.SetValueBool(val.(bool))
+	case []byte:
+		return edge.SetValueBytes(val.([]byte))
+	case *GeoPoint:
+		return edge.SetValueGeoJson(*(val.(*GeoPoint).Json()))
+	}
+	return errors.New("Val type is not supported ")
+}
+
+// This function gives pointer to json string of the struct, ignoring the errors
 func ToJsonUnsafe(v interface{}) *string {
 	data, err := json.Marshal(v)
 	if err != nil {
@@ -85,6 +135,7 @@ func ToJsonUnsafe(v interface{}) *string {
 	return StrPtr(string(data))
 }
 
+// Function to return pointer to string in the param, just easier way to do this
 func StrPtr(s string) *string {
 	return &s
 }

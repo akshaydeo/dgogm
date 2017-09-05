@@ -3,6 +3,8 @@ package dgorm_test
 import (
 	"testing"
 
+	"log"
+
 	"github.com/akshaydeo/dgorm"
 )
 
@@ -20,7 +22,18 @@ type Person2 struct {
 	Height   int    `dgraph:"height_in_cm"`
 }
 
-func TestGetUIdForStringId(t *testing.T) {
+type Person3 struct {
+	Id       int64  `dgraph:"uid"`
+	Name     string `dgraph:"name"`
+	DoesCode bool   `dgraph:"codes"`
+	Height   int    `dgraph:"height_in_cm"`
+}
+
+func (p *Person3) UId() string {
+	return "test"
+}
+
+func TestGetUId(t *testing.T) {
 	s := Person1{
 		"this_is_test",
 		"Akshay Deo",
@@ -40,6 +53,19 @@ func TestGetUIdForInt64Id(t *testing.T) {
 		183,
 	}
 	if dgorm.GetUId(&s) != "12312314_person2" {
+		t.Fail()
+	}
+}
+
+func TestGetUIdForUIdFunc(t *testing.T) {
+	s := Person3{
+		12312314,
+		"Akshay Deo",
+		true,
+		183,
+	}
+	log.Println(dgorm.GetUId(&s))
+	if dgorm.GetUId(&s) != "test" {
 		t.Fail()
 	}
 }

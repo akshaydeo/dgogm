@@ -3,9 +3,9 @@ package dgorm
 import "fmt"
 
 func Debug(f string, p ...interface{}) {
-	fmt.Printf(f, p)
+	fmt.Printf(fmt.Sprintf(f, p...))
 }
 
 func Error(f string, p ...interface{}) {
-	fmt.Printf(f, p)
+	fmt.Printf(fmt.Sprintf(f, p...))
 }
