@@ -1,4 +1,4 @@
-package dgorm
+package dgogm
 
 type GeoPoint struct {
 	Type       string            `json:"type"`

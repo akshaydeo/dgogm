@@ -1,25 +1,55 @@
-package dgorm_test
+package dgogm_test
 
 import (
 	"testing"
 
 	"log"
 
-	"github.com/akshaydeo/dgorm"
+	"github.com/akshaydeo/dgogm"
 )
 
 type Dog struct {
+	Id        int      `dgraph:"uid"`
+	Name      string   `dgraph:"name"`
+	Color     *string  `json:"color" dgraph:"color"`
+	Likes     []Place  `dgraph:"likes_places"`
+	Nicknames []string `dgraph:"nicknames"`
+	LivesAt   Place    `dgraph:"lives_at"`
+	BornAt    *Place   `dgraph:"born_at"`
+}
+
+func TestDgraph_AddWithAllPossibleCases(t *testing.T) {
+	dg, err := dgogm.Connect([]string{"127.0.0.1:9080"})
+	if err != nil {
+		t.Fail()
+	}
+	d := new(Dog)
+	d.Id = 1
+	d.Name = "jarvis"
+	d.Color = dgogm.StrPtr("white")
+	d.Likes = []Place{Place{1, "Pune"}, Place{2, "Mumbai"}}
+	d.Nicknames = []string{"chotu", "motu"}
+	d.LivesAt = Place{1, "Pune"}
+	d.BornAt = &Place{3, "Solapur"}
+	err = dg.Add(d)
+	if err != nil {
+		log.Println(err.Error())
+		t.Fail()
+	}
+}
+
+type Dog1 struct {
 	Id    int    `dgraph:"uid"`
 	Name  string `dgraph:"name"`
 	Color string `json:"color" dgraph:"color"`
 }
 
 func TestDgraph_Add(t *testing.T) {
-	dg, err := dgorm.Connect([]string{"127.0.0.1:9080"})
+	dg, err := dgogm.Connect([]string{"127.0.0.1:9080"})
 	if err != nil {
 		t.Fail()
 	}
-	d := new(Dog)
+	d := new(Dog1)
 	d.Id = 1
 	d.Name = "jarvis"
 	d.Color = "white"
@@ -43,7 +73,7 @@ type Place struct {
 }
 
 func TestDgraph_AddWithRelation(t *testing.T) {
-	dg, err := dgorm.Connect([]string{"127.0.0.1:9080"})
+	dg, err := dgogm.Connect([]string{"127.0.0.1:9080"})
 	if err != nil {
 		t.Fail()
 	}
@@ -71,7 +101,7 @@ type Place2 struct {
 }
 
 func TestDgraph_AddWithRelationWithoutId(t *testing.T) {
-	dg, err := dgorm.Connect([]string{"127.0.0.1:9080"})
+	dg, err := dgogm.Connect([]string{"127.0.0.1:9080"})
 	if err != nil {
 		t.Fail()
 	}
@@ -95,7 +125,7 @@ type Dog4 struct {
 }
 
 func TestDgraph_AddWithRelationPointer(t *testing.T) {
-	dg, err := dgorm.Connect([]string{"127.0.0.1:9080"})
+	dg, err := dgogm.Connect([]string{"127.0.0.1:9080"})
 	if err != nil {
 		t.Fail()
 	}
@@ -119,7 +149,7 @@ type Dog5 struct {
 }
 
 func TestDgraph_AddWithRelationSliceWithStruct(t *testing.T) {
-	dg, err := dgorm.Connect([]string{"127.0.0.1:9080"})
+	dg, err := dgogm.Connect([]string{"127.0.0.1:9080"})
 	if err != nil {
 		t.Fail()
 	}
@@ -143,7 +173,7 @@ type Dog6 struct {
 }
 
 func TestDgraph_AddWithRelationSliceWithPointer(t *testing.T) {
-	dg, err := dgorm.Connect([]string{"127.0.0.1:9080"})
+	dg, err := dgogm.Connect([]string{"127.0.0.1:9080"})
 	if err != nil {
 		t.Fail()
 	}
@@ -167,7 +197,7 @@ type Dog7 struct {
 }
 
 func TestDgraph_AddWithRelationSliceWithPrimitiveDt(t *testing.T) {
-	dg, err := dgorm.Connect([]string{"127.0.0.1:9080"})
+	dg, err := dgogm.Connect([]string{"127.0.0.1:9080"})
 	if err != nil {
 		t.Fail()
 	}
@@ -191,7 +221,7 @@ type Dog8 struct {
 }
 
 func TestDgraph_AddWithRelationSliceWithPrimitiveDtPointer(t *testing.T) {
-	dg, err := dgorm.Connect([]string{"127.0.0.1:9080"})
+	dg, err := dgogm.Connect([]string{"127.0.0.1:9080"})
 	if err != nil {
 		t.Fail()
 	}
@@ -199,7 +229,7 @@ func TestDgraph_AddWithRelationSliceWithPrimitiveDtPointer(t *testing.T) {
 	d.Id = 1
 	d.Name = "jarvis"
 	d.Color = "white"
-	d.NickNames = []*string{dgorm.StrPtr("chotu"), dgorm.StrPtr("motu")}
+	d.NickNames = []*string{dgogm.StrPtr("chotu"), dgogm.StrPtr("motu")}
 	err = dg.Add(d)
 	if err != nil {
 		log.Println(err.Error())

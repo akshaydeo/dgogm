@@ -1,11 +1,11 @@
-package dgorm_test
+package dgogm_test
 
 import (
 	"testing"
 
 	"log"
 
-	"github.com/akshaydeo/dgorm"
+	"github.com/akshaydeo/dgogm"
 )
 
 type Person1 struct {
@@ -40,7 +40,7 @@ func TestGetUId(t *testing.T) {
 		true,
 		183,
 	}
-	if dgorm.GetUId(&s) != "this_is_test_person1" {
+	if dgogm.GetUId(&s) != "this_is_test_person1" {
 		t.Fail()
 	}
 }
@@ -52,7 +52,7 @@ func TestGetUIdForInt64Id(t *testing.T) {
 		true,
 		183,
 	}
-	if dgorm.GetUId(&s) != "12312314_person2" {
+	if dgogm.GetUId(&s) != "12312314_person2" {
 		t.Fail()
 	}
 }
@@ -64,8 +64,8 @@ func TestGetUIdForUIdFunc(t *testing.T) {
 		true,
 		183,
 	}
-	log.Println(dgorm.GetUId(&s))
-	if dgorm.GetUId(&s) != "test" {
+	log.Println(dgogm.GetUId(&s))
+	if dgogm.GetUId(&s) != "test" {
 		t.Fail()
 	}
 }

@@ -1,4 +1,4 @@
-package dgorm
+package dgogm
 
 import (
 	"reflect"
@@ -22,12 +22,14 @@ func (d *Dgraph) Add(p interface{}) error {
 	return err
 }
 
-func isPrimitiveKind(kind reflect.Kind) bool {
-	switch kind {
+func isPrimitiveType(tp reflect.Type) bool {
+	switch tp.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
 		reflect.Float64, reflect.Float32, reflect.String, reflect.Bool:
 		return true
+	case reflect.Ptr:
+		return isPrimitiveType(tp.Elem())
 	}
 	return false
 }
@@ -69,20 +71,9 @@ func (d *Dgraph) add(sid string, p interface{}) (*client.Node, error) {
 				return nil, nil
 			}
 			// Check if this array contains a primitive kind of elements
-			Debug("kind is %s", v.Elem().Field(i).Index(0).Type().Kind())
-			if isPrimitiveKind(v.Elem().Field(i).Index(0).Type().Kind()) {
+			if isPrimitiveType(v.Elem().Field(i).Index(0).Type()) {
 				// Then jsonify them and push them inside
 				Debug("Adding %s", ToJsonUnsafe(v.Elem().Field(i).Interface()))
-				_, err = d.process(r, snode, t.Elem().Field(i), reflect.ValueOf(ToJsonUnsafe(v.Elem().Field(i).Interface())))
-				if err != nil {
-					return nil, err
-				}
-				continue
-			}
-			// Check if this array contains pointer to primitive types
-			if isPrimitiveKind(v.Elem().Field(i).Index(0).Type().Elem().Kind()) {
-				// Then jsonify them and push them inside
-				Debug("Adding ptr %s", ToJsonUnsafe(v.Elem().Field(i).Interface()))
 				_, err = d.process(r, snode, t.Elem().Field(i), reflect.ValueOf(ToJsonUnsafe(v.Elem().Field(i).Interface())))
 				if err != nil {
 					return nil, err
@@ -134,12 +125,18 @@ func (d *Dgraph) add(sid string, p interface{}) (*client.Node, error) {
 	return &snode, nil
 }
 
-// TODO
+// TODO write documentation
 func (d *Dgraph) process(r *client.Req, snode client.Node, field reflect.StructField, value reflect.Value) (*client.Edge, error) {
 	var e client.Edge
 	var err error
 	switch value.Kind() {
 	case reflect.Ptr:
+		Debug(value.Elem().Kind().String())
+		// Checking if its pointer to primitve data type
+		if isPrimitiveType(value.Elem().Type()) {
+			// its pointer to primitive kind
+			return d.process(r, snode, field, value.Elem())
+		}
 		Debug("its ptr******", field.Type.Elem())
 		tnode, err := d.add(GetUId(value.Interface()), value.Interface())
 		if err != nil {

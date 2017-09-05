@@ -1,4 +1,4 @@
-package dgorm
+package dgogm
 
 import (
 	"encoding/json"
