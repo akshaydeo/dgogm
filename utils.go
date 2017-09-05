@@ -13,6 +13,7 @@ import (
 
 	"github.com/dgraph-io/dgraph/client"
 	"github.com/dgraph-io/dgraph/protos"
+	"github.com/media-net/cargo/logger"
 	"github.com/satori/go.uuid"
 )
 
@@ -34,6 +35,39 @@ func IsZero(v reflect.Value) bool {
 		return v.IsNil()
 	}
 	return false
+}
+
+// This function converts protos.Value to corresponding goland datatype
+func convert(val *protos.Value) (interface{}, error) {
+	switch val.Val.(type) {
+	case *protos.Value_StrVal:
+		return strings.Replace(val.GetStrVal(), "\\\"", "\"", -1), nil
+	case *protos.Value_BoolVal:
+		return val.GetBoolVal(), nil
+	case *protos.Value_IntVal:
+		return val.GetIntVal(), nil
+	case *protos.Value_UidVal:
+		return val.GetUidVal(), nil
+	case *protos.Value_DateVal:
+		logger.D("Parsing time")
+		t, err := time.Parse("2006-01-02 19:54:00.000000000 +0000 UTC", string(val.GetDatetimeVal()))
+		if err != nil {
+			logger.E("Error while parsing datetime", err)
+			return string(val.GetDatetimeVal()), err
+		}
+		return t, nil
+	case *protos.Value_DatetimeVal:
+		logger.D("Parsing time")
+		t, err := time.Parse("2006-01-02 19:54:00.000000000 +0000 UTC", string(val.GetDatetimeVal()))
+		if err != nil {
+			logger.E("Error while parsing datetime", err)
+			return string(val.GetDatetimeVal()), err
+		}
+		return t, nil
+	default:
+		return val.GetDefaultVal(), nil
+	}
+	return nil, nil
 }
 
 // This function returns the name for the given struct field

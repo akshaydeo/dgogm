@@ -1,0 +1,7 @@
+package dgogm
+
+
+
+func fieldByTagName(){
+
+}

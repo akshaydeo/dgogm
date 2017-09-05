@@ -1,6 +1,7 @@
 package dgogm_test
 
 import (
+	"fmt"
 	"testing"
 
 	"log"
@@ -16,6 +17,20 @@ type Dog struct {
 	Nicknames []string `dgraph:"nicknames"`
 	LivesAt   Place    `dgraph:"lives_at"`
 	BornAt    *Place   `dgraph:"born_at"`
+}
+
+func TestDgraph_FindById(t *testing.T) {
+	dg, err := dgogm.Connect([]string{"127.0.0.1:9080"})
+	if err != nil {
+		t.Fail()
+	}
+	d := new(Dog2)
+	d.Id = 1
+	err = dg.FindById(d)
+	if err != nil {
+		t.Fail()
+	}
+	fmt.Printf("%v", d)
 }
 
 func TestDgraph_AddWithAllPossibleCases(t *testing.T) {

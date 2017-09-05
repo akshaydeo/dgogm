@@ -5,7 +5,11 @@ import (
 
 	"context"
 
+	"fmt"
+
 	"github.com/dgraph-io/dgraph/client"
+	"github.com/dgraph-io/dgraph/protos"
+	"github.com/media-net/cargo/logger"
 	"github.com/pkg/errors"
 )
 
@@ -22,6 +26,116 @@ func (d *Dgraph) Add(p interface{}) error {
 	return err
 }
 
+// This function finds the given node from the Dgraph using given id
+func (d *Dgraph) FindById(p interface{}) error {
+	t := reflect.TypeOf(p).Elem()
+	fields := FieldMap{}
+	getFieldMap(t, "", fields)
+	Debug("%s", fields.String())
+	nodes, err := d.query(fmt.Sprintf(GET_NODE_FOR_ID, t.Name(), hash(GetUId(p)), fields.String()))
+	if err != nil {
+		return err
+	}
+	if len(nodes) == 0 {
+		errors.New("No results found")
+	}
+	parseNodeTo(nodes[0].Children[0], p)
+	return nil
+}
+
+// This function converts proto.Node to a map
+func nodeMap(n *protos.Node) map[string]interface{} {
+	m := map[string]interface{}{}
+	for _, p := range n.Properties {
+		v, err := convert(p.Value)
+		if err != nil {
+			continue
+		}
+		m[p.Prop] = v
+	}
+	for _, c := range n.Children {
+		m[c.Attribute] = c
+	}
+	return m
+}
+
+// This function parses protos.Node to fill data into given interface
+func parseNodeTo(n *protos.Node, p interface{}) {
+	v := reflect.ValueOf(p)
+	t := reflect.TypeOf(p)
+	// Fetching properties from the node
+	props := nodeMap(n)
+	for i := 0; i < v.Elem().NumField(); i++ {
+		fname := getFieldName(t.Elem().Field(i))
+		if fname == "-" {
+			continue
+		}
+		// Search that property and assign the values
+		val, ok := props[fname]
+		if !ok {
+			Debug("Property %s is not present in the results", fname)
+			continue
+		}
+		if !v.Elem().Field(i).IsValid() {
+			logger.W("Invalid field", v.Elem().Field(i).String(), t.Elem().Field(i).Name)
+			continue
+		}
+		Debug("%s %s", reflect.ValueOf(val).Type().String(), t.Elem().Field(i).Type)
+		switch v.Elem().Field(i).Kind() {
+		case reflect.Slice:
+			Debug("slices are not handled yet")
+		case reflect.Ptr:
+			Debug("Ptrs are not yet supported")
+		case reflect.Struct:
+			nf := reflect.New(t.Elem().Field(i).Type)
+			parseNodeTo(val.(*protos.Node), nf.Interface())
+			v.Elem().Field(i).Set(nf.Elem())
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Float64, reflect.Float32, reflect.String, reflect.Bool, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			// This includes all primitive types
+			Debug("Setting %s with %v", fname, reflect.ValueOf(val))
+			if v.Elem().Field(i).Type() != reflect.ValueOf(val).Type() {
+				continue
+			}
+			v.Elem().Field(i).Set(reflect.ValueOf(val))
+		}
+	}
+}
+
+// This function fires the given query on connected dgraph and fetches back the response
+// Does no alteration to the response
+func (d *Dgraph) query(q string) ([]*protos.Node, error) {
+	req := new(client.Req)
+	Debug("Firing %s", q)
+	req.SetQuery(q)
+	resp, err := d.client.Run(context.Background(), req)
+	if err != nil {
+		return nil, err
+	}
+	return resp.N, err
+}
+
+// This function converts types into fields query for Dgraph
+func getFieldMap(t reflect.Type, parent string, m FieldMap) {
+	Debug("%s", t.Name())
+	for i := 0; i < t.NumField(); i++ {
+		Debug("Checking if its a primitive type %s", getFieldName(t.Field(i)))
+		if isPrimitiveType(t.Field(i).Type) {
+			m.Add(parent, getFieldName(t.Field(i)))
+			continue
+		}
+		Debug("Non primitive type %s", getFieldName(t.Field(i)))
+		switch t.Kind() {
+		case reflect.Slice:
+		case reflect.Struct:
+			nm := FieldMap{}
+			getFieldMap(t.Field(i).Type, getFieldName(t.Field(i)), nm)
+			m.Add(parent, nm)
+		case reflect.Ptr:
+		}
+	}
+}
+
+// This function returns if given type is a or points to a primitive type
 func isPrimitiveType(tp reflect.Type) bool {
 	switch tp.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
@@ -125,7 +239,9 @@ func (d *Dgraph) add(sid string, p interface{}) (*client.Node, error) {
 	return &snode, nil
 }
 
-// TODO write documentation
+// This function does the core processing of the fields
+// Detects the name of the field, type of the field, and decides how to attach it with
+// all the available information
 func (d *Dgraph) process(r *client.Req, snode client.Node, field reflect.StructField, value reflect.Value) (*client.Edge, error) {
 	var e client.Edge
 	var err error
