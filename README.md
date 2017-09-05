@@ -38,8 +38,6 @@ func main() {
 	}
 }
 ```
-
-Is mapped to
 **Query:**
 ```graphql
 {
