@@ -24,13 +24,125 @@ func TestDgraph_FindById(t *testing.T) {
 	if err != nil {
 		t.Fail()
 	}
-	d := new(Dog5)
+	d := new(Dog)
 	d.Id = 1
-	err = dg.FindById(d)
+	err = dg.Find(d).Id(1).Execute()
 	if err != nil {
 		t.Fail()
 	}
-	fmt.Printf("%v %v", d, d.LikesPlace)
+	fmt.Printf("%v %v", d, *d.Color)
+}
+
+func TestDgraph_FindById1(t *testing.T) {
+	dg, err := dgogm.Connect([]string{"127.0.0.1:9080"})
+	if err != nil {
+		t.Fail()
+	}
+	d := new(Dog1)
+	d.Id = 1
+	err = dg.Find(d).Id(1).Execute()
+	if err != nil {
+		t.Fail()
+	}
+	fmt.Printf("%v", d)
+}
+
+func TestDgraph_FindById2(t *testing.T) {
+	dg, err := dgogm.Connect([]string{"127.0.0.1:9080"})
+	if err != nil {
+		t.Fail()
+	}
+	d := new(Dog2)
+	d.Id = 1
+	err = dg.Find(d).Id(1).Execute()
+	if err != nil {
+		t.Fail()
+	}
+	fmt.Printf("%v", d)
+}
+
+func TestDgraph_FindById3(t *testing.T) {
+	dg, err := dgogm.Connect([]string{"127.0.0.1:9080"})
+	if err != nil {
+		t.Fail()
+	}
+	d := new(Dog3)
+	d.Id = 1
+	err = dg.Find(d).Id(1).Execute()
+	if err != nil {
+		t.Fail()
+	}
+	fmt.Printf("%v", d)
+}
+
+func TestDgraph_FindById4(t *testing.T) {
+	dg, err := dgogm.Connect([]string{"127.0.0.1:9080"})
+	if err != nil {
+		t.Fail()
+	}
+	d := new(Dog4)
+	d.Id = 1
+	err = dg.Find(d).Id(1).Execute()
+	if err != nil {
+		t.Fail()
+	}
+	fmt.Printf("%v", d)
+}
+
+func TestDgraph_FindById5(t *testing.T) {
+	dg, err := dgogm.Connect([]string{"127.0.0.1:9080"})
+	if err != nil {
+		t.Fail()
+	}
+	d := new(Dog5)
+	d.Id = 1
+	err = dg.Find(d).Id(1).Execute()
+	if err != nil {
+		t.Fail()
+	}
+	fmt.Printf("%v", d)
+}
+
+func TestDgraph_FindById6(t *testing.T) {
+	dg, err := dgogm.Connect([]string{"127.0.0.1:9080"})
+	if err != nil {
+		t.Fail()
+	}
+	d := new(Dog6)
+	d.Id = 1
+	err = dg.Find(d).Id(1).Execute()
+	if err != nil {
+		t.Fail()
+	}
+	fmt.Printf("%v", d)
+}
+
+func TestDgraph_FindById7(t *testing.T) {
+	dg, err := dgogm.Connect([]string{"127.0.0.1:9080"})
+	if err != nil {
+		t.Fail()
+	}
+	d := new(Dog7)
+	d.Id = 1
+	err = dg.Find(d).Id(1).Execute()
+	if err != nil {
+		t.Fail()
+	}
+	fmt.Printf("%v", d)
+}
+
+func TestDgraph_FindById8(t *testing.T) {
+	dg, err := dgogm.Connect([]string{"127.0.0.1:9080"})
+	if err != nil {
+		t.Fail()
+	}
+	d := new(Dog8)
+	d.Id = 1
+	err = dg.Find(d).Id(1).Execute()
+	if err != nil {
+		t.Fail()
+	}
+	fmt.Printf("%v %v", d, *d.NickNames[0])
 }
 
 func TestDgraph_AddWithAllPossibleCases(t *testing.T) {

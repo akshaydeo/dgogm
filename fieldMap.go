@@ -64,9 +64,18 @@ func getFieldMap(t reflect.Type, parent string, m FieldMap) {
 		switch t.Field(i).Type.Kind() {
 		case reflect.Slice:
 			Debug("It's a slice")
-			Debug("%s []%s", getFieldName(t.Field(i)), t.Field(i).Type.Elem().Name())
+			Debug("%s []%s", getFieldName(t.Field(i)), t.Field(i).Type.Elem().Kind())
 			nm := FieldMap{}
-			getFieldMap(t.Field(i).Type.Elem(), getFieldName(t.Field(i)), nm)
+			if isPrimitiveType(t.Field(i).Type.Elem()) {
+				m.Add(parent, getFieldName(t.Field(i)))
+				continue
+			}
+			switch t.Field(i).Type.Elem().Kind() {
+			case reflect.Struct:
+				getFieldMap(t.Field(i).Type.Elem(), getFieldName(t.Field(i)), nm)
+			case reflect.Ptr:
+				getFieldMap(t.Field(i).Type.Elem().Elem(), getFieldName(t.Field(i)), nm)
+			}
 			m.Add(parent, nm)
 		case reflect.Struct:
 			nm := FieldMap{}

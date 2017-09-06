@@ -191,6 +191,11 @@ func ToJsonUnsafe(v interface{}) string {
 	return string(data)
 }
 
+// This function converts json string to interface
+func FromJson(data string, v interface{}) error {
+	return json.Unmarshal([]byte(data), v)
+}
+
 // Function to return pointer to string in the param, just easier way to do this
 func StrPtr(s string) *string {
 	return &s
