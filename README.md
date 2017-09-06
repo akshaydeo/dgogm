@@ -3,11 +3,8 @@
 OGM is synonymous for ORM, Object Graph Mapping. Thanks @gazaidi for suggesting this.
 
 ## How it works?
-
+### Struct for this example
 ```go
-import 	"github.com/akshaydeo/dgogm"
-
-// Struct definition
 type Dog struct {
 	Id        int      `dgraph:"uid"`
 	Name      string   `dgraph:"name"`
@@ -17,13 +14,14 @@ type Dog struct {
 	LivesAt   Place    `dgraph:"lives_at"`
 	BornAt    *Place   `dgraph:"born_at"`
 }
-
+```
+### Adding struct to the graph
+#### Using existing client connection
+```go
 // Adding object to the dgraph
 func main() {
-  	dg, err := dgogm.Connect([]string{"127.0.0.1:9080"})
-	if err != nil {
-		t.Fail()
-	}
+  	var client *client.Dgraph
+	// perform client connection	
 	d := new(Dog)
 	d.Id = 1
 	d.Name = "jarvis"
@@ -32,36 +30,33 @@ func main() {
 	d.Nicknames = []string{"chotu", "motu"}
 	d.LivesAt = Place{1, "Pune"}
 	d.BornAt = &Place{3, "Solapur"}
-	err = dg.Add(d)
+	err = dgogm.Add(c, d)
 	if err != nil {
 		log.Println(err.Error())
 		t.Fail()
 	}
 }
 ```
-
-**Query:**
-
-```graphql
-{
-  dog(func: eq(_xid_,"1_dog")){
-    name
-    color
-    likes_places{
-      name
-    }
-    nicknames
-    lives_at{
-      name
-    }
-    born_at{
-      name
-    }
-    _xid_
-  }
+#### Using dgogm client 
+```go
+// Adding object to the dgraph
+func main() {
+	dg, err := dgogm.Connect([]string{"127.0.0.1:9080"})
+	if err != nil {
+		t.Fail()
+	}
+	d := new(Dog)
+	d.Id = 1
+	d.Name = "jarvis"
+	d.Color = dgogm.StrPtr("white")
+	d.Likes = []Place{Place{1, "Pune"}, Place{2, "Mumbai"}}
+	d.Nicknames = []string{"chotu", "motu"}
+	d.LivesAt = Place{1, "Pune"}
+	d.BornAt = &Place{3, "Solapur"}
+	err = dg.Add(d)
 }
 ```
-**Graph**
+**Resultant Graph Data**
 
 ![Resulting Graph](https://github.com/akshaydeo/dgorm/raw/master/.github/one.png)
 
@@ -109,7 +104,45 @@ func main() {
   }
 }
 ```
-
+### Getting structs back from the DGraph
+#### Using dgog client
+```go
+func main() {
+	dg, err := dgogm.Connect([]string{"127.0.0.1:9080"})
+	if err != nil {
+		t.Fail()
+	}
+	d := new(Dog)
+	d.Id = 1
+	err = dg.Find(d).Id(1).Execute()
+	if err != nil {
+		t.Fail()
+	}
+	fmt.Printf("%v", d)
+}
+```
+**Output**
+```bash
+&{1 jarvis 0xc42021b270 [{0 Pune} {0 Mumbai}] [] {0 Pune} 0xc4200f9cc0}
+```
+#### Using existing client
+```go
+func main() {
+	var c *client.Dgraph
+	// make connection
+	d := new(Dog)
+	d.Id = 1
+	err = Find(c, d).Id(1).Execute()
+	if err != nil {
+		t.Fail()
+	}
+	fmt.Printf("%v", d)
+}
+```
+**Output**
+```bash
+&{1 jarvis 0xc42021b270 [{0 Pune} {0 Mumbai}] [] {0 Pune} 0xc4200f9cc0}
+```
 
 ## Supported datatypes
 - Primitive datatypes
